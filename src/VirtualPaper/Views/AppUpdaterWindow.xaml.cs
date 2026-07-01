@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using DJ;
 using VirtualPaper.ViewModels;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
@@ -32,7 +33,6 @@ namespace VirtualPaper.Views {
                 case DownloadState.DownloadFailed:
                 case DownloadState.VerifyFailed:
                 case DownloadState.Verifying:
-                case DownloadState.Completed:
                     e.Cancel = true;
 
                     var confirmClose = await _viewModel.ShowCancelDialogAsync();
@@ -59,6 +59,15 @@ namespace VirtualPaper.Views {
             if (key == Key.Tab) {
                 e.Handled = true;
             }
+        }
+
+        private void ActionBtn_Click(object sender, RoutedEventArgs e) {
+            if (_viewModel.IsRestartUpdate && _viewModel.CurrentState == DownloadState.Completed) {
+                this.Close();
+                return;
+            }
+
+            _viewModel.OnActionCommand();
         }
 
         private readonly AppUpdaterWindowViewModel _viewModel;

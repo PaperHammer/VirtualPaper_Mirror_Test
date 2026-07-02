@@ -16,13 +16,13 @@ namespace VirtualPaper.Cores.AppUpdate.Models {
         public string MinAppBuild { get; set; } = string.Empty;
 
         [JsonPropertyName("plugins")]
-        public Dictionary<string, PluginUpdateInfo> Plugins { get; set; } = new();
+        public Dictionary<string, PluginUpdateInfo> Plugins { get; set; } = [];
 
         [JsonPropertyName("removed_plugins")]
-        public List<string> RemovedPlugins { get; set; } = new();
+        public List<string> RemovedPlugins { get; set; } = [];
 
-        public bool IsRestartUpdate => Type.Equals("restart", StringComparison.OrdinalIgnoreCase);
-        public bool IsInstallUpdate => Type.Equals("install", StringComparison.OrdinalIgnoreCase);
+        public bool IsRestartUpdate => Type.Equals("plugins", StringComparison.OrdinalIgnoreCase);
+        public bool IsInstallUpdate => !IsRestartUpdate;
     }
 
     public class PluginUpdateInfo {

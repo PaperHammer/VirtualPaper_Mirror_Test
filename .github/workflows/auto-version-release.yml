@@ -161,16 +161,26 @@ jobs:
         $newVersionText = "${major}_${minor}_${build}_${revision}"
         Write-Host "Version: $currentVersion -> $newVersion"
 
-        # ── Generate build number: YYMM + R + DD + T + HHMM ─────────
+        # ── Generate build number: YYMM + R + xx (每月重置) ─────────
+        # 查询 GitHub releases 统计当月发布次数
         $now = Get-Date
-        $buildNumber = $now.ToString("yyMM") + "R" + $now.ToString("dd") + "T" + $now.ToString("HHmm")
-        Write-Host "Build number: $buildNumber"
+        $yearMonth = $now.ToString("yyMM")
+        $repo = "${{ github.repository }}"
+        
+        # 获取所有 releases，统计当月 tag 数量
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases" -Headers @{ "Accept" = "application/vnd.github.v3+json" }
+        $monthPattern = "v.*${yearMonth}R"
+        $monthCount = ($releases | Where-Object { $_.tag_name -match $monthPattern }).Count
+        $buildSeq = $monthCount + 1
+        
+        $buildNumber = "${yearMonth}R{0:D2}" -f $buildSeq
+        Write-Host "Build number: $buildNumber (month count: $monthCount, seq: $buildSeq)"
 
         # ── Generate release tag ─────────────────────────────────────
         # Plugin 更新：tag 后缀用字母编码 build number，保证旧客户端正则兼容
         #   数字 0-9 → A-J，字母原样保留
-        #   例：2607R01T2100 → CGAHRABTCBAA
-        #   tag：v0.4.1.0pluginCGAHRABTCBAA → 正则后 0.4.1.0
+        #   例：2607R01 → CGAHRAAB
+        #   tag：v0.4.1.0pluginCGAHRAAB → 正则后 0.4.1.0
         # 常规更新：tag 为 v{version}
         if ($isPluginUpdate) {
             $encoded = ($buildNumber.ToCharArray() | ForEach-Object {
@@ -257,6 +267,25 @@ jobs:
 
     - name: Rebuild solution
       run: msbuild src/VirtualPaper.sln /t:Rebuild /p:Configuration=Release /p:Platform="Any CPU" /restore /m
+
+    - name: Generate app_build.json
+      shell: pwsh
+      run: |
+        $buildNumber = "${{ needs.prepare.outputs.build_number }}"
+        $outDir = "src/VirtualPaper/bin/Release/net8.0-windows10.0.19041.0"
+        $json = @{
+            app_build = $buildNumber
+            plugins = @{
+                UI = $buildNumber
+                PlayerWeb = $buildNumber
+                ScrSaver = $buildNumber
+                ML = $buildNumber
+                Shaders = $buildNumber
+            }
+        } | ConvertTo-Json -Depth 3
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText("$outDir/app_build.json", $json, $utf8NoBom)
+        Write-Host "[OK] Generated app_build.json with build $buildNumber"
 
     - name: Validate Build Artifacts
       # 在产物就地校验：主 exe / Plugin exe / 核心 dll 存在且非空。

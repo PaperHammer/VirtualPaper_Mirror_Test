@@ -127,7 +127,7 @@
     <value>Installing...</value>
   </data>
   <data name="AppUpdater_ActionButtonText_Paused" xml:space="preserve">
-    <value>Resume downloading</value>
+    <value>Resume</value>
   </data>
   <data name="AppUpdater_ActionButtonText_Ready" xml:space="preserve">
     <value>Download</value>
@@ -139,7 +139,7 @@
     <value>Download complete!</value>
   </data>
   <data name="AppUpdater_StatusText_DownloadFailed" xml:space="preserve">
-    <value>Unable to access the resource, please check your network and try again.</value>
+    <value>Unable to access, please check network or try again.</value>
   </data>
   <data name="AppUpdater_StatusText_Downloading" xml:space="preserve">
     <value>Downloading...</value>
@@ -192,6 +192,9 @@ https://github.com/PaperHammer/VirtualPaper/releases</value>
   </data>
   <data name="Find_New_Verison" xml:space="preserve">
     <value>Find a newer version!</value>
+  </data>
+  <data name="Find_New_Version_Restart" xml:space="preserve">
+    <value>Component update available!</value>
   </data>
   <data name="Systray_TextCloseAllWallpapers" xml:space="preserve">
     <value>Close all wallpapers</value>
@@ -252,5 +255,38 @@ Windows Explorer restarted twice in the last 30 seconds!This could be a conflict
 3. Enable/check "Animation controls and elements within the window" (uncheck if already checked) and apply.
 4. Close the window by clicking Apply and then OK.
 If it still doesn't work, shut down and restart or reboot the system.(Doesn't work in some Windows 10 preview versions)</value>
+  </data>
+  <data name="RestartUpdate_InvalidInfo" xml:space="preserve">
+    <value>Invalid update info</value>
+  </data>
+  <data name="RestartUpdate_Starting" xml:space="preserve">
+    <value>Starting update...</value>
+  </data>
+  <data name="RestartUpdate_Completed" xml:space="preserve">
+    <value>Update completed. UI will restart.</value>
+  </data>
+  <data name="RestartUpdate_Failed" xml:space="preserve">
+    <value>Update failed: {0}</value>
+  </data>
+  <data name="RestartUpdate_Stage_Downloading" xml:space="preserve">
+    <value>Downloading plugins...</value>
+  </data>
+  <data name="RestartUpdate_Stage_BackingUp" xml:space="preserve">
+    <value>Backing up current plugins...</value>
+  </data>
+  <data name="RestartUpdate_Stage_Replacing" xml:space="preserve">
+    <value>Replacing plugin files...</value>
+  </data>
+  <data name="RestartUpdate_Stage_Completed" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="RestartUpdate_Stage_Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="RestartUpdate_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="RestartUpdate_PostponeTip" xml:space="preserve">
+    <value>Update ready. Close the main window to apply.</value>
   </data>
 </root>

@@ -32,6 +32,7 @@ using VirtualPaper.GrpcServers;
 using VirtualPaper.lang;
 using VirtualPaper.Models;
 using VirtualPaper.Models.Cores.Interfaces;
+using VirtualPaper.Models.Events;
 using VirtualPaper.Services;
 using VirtualPaper.Services.Download;
 using VirtualPaper.Services.Interfaces;
@@ -86,7 +87,7 @@ namespace VirtualPaper {
             #region 必要路径处理
             try {
                 // 清空缓存
-                FileUtil.EmptyDirectory(Constants.CommonPaths.TempDir);
+                FileUtil.RemoveDirectory(Constants.CommonPaths.TempDir);
             }
             catch { }
 
@@ -116,6 +117,8 @@ namespace VirtualPaper {
             _serviceProvider = ConfigureServices();
             // 将方法绑定到 Grpc 服务上
             _grpcServer = ConfigureGrpcServer();
+            // 检查是否有未完成的热更新，执行恢复（阻塞等待完成）
+            Services.GetRequiredService<IRestartUpdateService>().CheckAndRecoverAsync().GetAwaiter().GetResult();
             #endregion
 
             #region 用户配置
@@ -229,6 +232,8 @@ namespace VirtualPaper {
                 .AddSingleton<IUIRunnerService, UIRunnerService>()
                 .AddSingleton<IUserSettingsService, UserSettingsService>()
                 .AddSingleton<IAppUpdaterService, GithubUpdaterService>()
+                .AddSingleton<IRestartUpdateService, RestartUpdateService>()
+                .AddSingleton<IAppBuildService, AppBuildService>()
                 .AddSingleton<IDownloadService, MultiDownloadService>()
                 .AddSingleton<IWindowService, WindowService>()
                 .AddSingleton<INativeService, NativeService>()
@@ -319,8 +324,9 @@ namespace VirtualPaper {
         public static void AppUpdateDialog(AppUpdaterEventArgs e) {
             _updateNotify = false;
             var windowService = Services.GetRequiredService<IWindowService>();
-            var info = new AppUpdateInfo(e.UpdateUri, e.UpdateSHAUri, e.UpdateVersion.ToString(), e.ChangeLog);
-            windowService.Show<AppUpdaterWindow>(info);
+
+            // Both installer-style and restart-style updates use AppUpdaterWindow
+            windowService.Show<AppUpdaterWindow>(e.Release);
         }
 
         private static int _updateNotifyAmt = 1;
@@ -331,8 +337,15 @@ namespace VirtualPaper {
                     if (_updateNotifyAmt > 0) {
                         _updateNotifyAmt--;
                         _updateNotify = true;
+
+                        var updater = Services.GetRequiredService<IAppUpdaterService>();
+                        var isRestart = updater.LastReleaseInfo?.IsRestartUpdate == true;
+                        var toastKey = isRestart
+                            ? Constants.I18n.Find_New_Version_Restart
+                            : nameof(Constants.I18n.Settings_General_Version_FindNew);
+
                         new ToastContentBuilder()
-                            .AddText(LanguageManager.Instance["Find_New_Verison"])
+                            .AddText(LanguageManager.Instance[toastKey])
                             .Show();
                     }
 
@@ -365,9 +378,9 @@ namespace VirtualPaper {
             Application.Current.Dispatcher.Invoke(Application.Current.Shutdown);
         }
 
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceProvider _serviceProvider = null!;
         private readonly Mutex _mutex = new(false, Constants.CoreField.UniqueAppUid);
-        private readonly NamedPipeServer _grpcServer;
+        private readonly NamedPipeServer _grpcServer = null!;
         private static readonly CancellationTokenSource _ctsPlayback = new();
         private static readonly Logger _log = LogManager.GetCurrentClassLogger();
     }

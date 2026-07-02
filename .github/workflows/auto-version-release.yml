@@ -22,7 +22,7 @@ jobs:
   # Job 1: 准备阶段 - 记录 SHA、确定分支、计算新版本号
   # ─────────────────────────────────────────────────────────────
   prepare:
-    name: Prepare - Calculate Version & Record SHAs
+    name: Prepare - Version & Metadata
     runs-on: windows-latest
     if: |
       github.event.pull_request.merged == true &&
@@ -40,6 +40,10 @@ jobs:
       release_sha: ${{ steps.shas.outputs.release_sha }}
       pr_title: ${{ steps.pr_info.outputs.pr_title }}
       pr_body: ${{ steps.pr_info.outputs.pr_body }}
+      has_plugin_update: ${{ steps.version.outputs.has_plugin_update }}
+      update_plugins: ${{ steps.version.outputs.update_plugins }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
 
     steps:
     - name: Checkout with full history
@@ -53,19 +57,20 @@ jobs:
       shell: powershell
       run: |
         $mainSha = git rev-parse HEAD
-        Write-Output "main_sha=$mainSha" >> $env:GITHUB_OUTPUT
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "main_sha=$mainSha`n", $utf8NoBom)
         Write-Host "main SHA: $mainSha"
 
         $devSha = git rev-parse origin/dev
-        Write-Output "dev_sha=$devSha" >> $env:GITHUB_OUTPUT
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "dev_sha=$devSha`n", $utf8NoBom)
         Write-Host "dev SHA: $devSha"
 
         $bugfixSha = git rev-parse origin/bugfix
-        Write-Output "bugfix_sha=$bugfixSha" >> $env:GITHUB_OUTPUT
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "bugfix_sha=$bugfixSha`n", $utf8NoBom)
         Write-Host "bugfix SHA: $bugfixSha"
 
         $releaseSha = git rev-parse origin/release
-        Write-Output "release_sha=$releaseSha" >> $env:GITHUB_OUTPUT
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "release_sha=$releaseSha`n", $utf8NoBom)
         Write-Host "release SHA: $releaseSha"
 
     - name: Determine source branch and version increment
@@ -90,12 +95,15 @@ jobs:
             Write-Host "Unknown source branch: $sourceBranch - defaulting to patch"
         }
 
-        Write-Output "source_branch=$sourceBranch" >> $env:GITHUB_OUTPUT
-        Write-Output "increment_type=$incrementType" >> $env:GITHUB_OUTPUT
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "source_branch=$sourceBranch`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "increment_type=$incrementType`n", $utf8NoBom)
 
-    - name: Calculate new version
+    - name: Prepare release metadata
       id: version
       shell: powershell
+      env:
+        PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
       run: |
         $csprojPath = "src/VirtualPaper/VirtualPaper.csproj"
         $content = Get-Content $csprojPath -Raw
@@ -112,28 +120,88 @@ jobs:
         $revision = [int]$versionMatch.Groups[4].Value
 
         $currentVersion = "$major.$minor.$build.$revision"
+        $currentVersionText = "${major}_${minor}_${build}_${revision}"
 
-        $incrementType = "${{ steps.branch_info.outputs.increment_type }}"
-        if ($incrementType -eq "feature") {
-            $minor = $minor + 1      # 第2位 +1
-            $build = 0               # 第3位 清零
-            $revision = 0            # 第4位 清零
-        } elseif ($incrementType -eq "minor") {
-            $build = $build + 1      # 第3位 +1
-            $revision = 0            # 第4位 清零
+        # ── Detect plugin update labels ──────────────────────────────
+        $labels = "$env:PR_LABELS" -split ',' | ForEach-Object { $_.Trim() }
+        $isPluginUpdate = $false
+        $plugins = @()
+
+        if ($labels -contains "update-plugins") {
+            $isPluginUpdate = $true
+            $plugins = @("UI", "PlayerWeb", "ScrSaver", "ML", "Shaders")
         } else {
-            $revision = $revision + 1  # 第4位 +1
+            if ($labels -contains "update-plugin-ui")         { $isPluginUpdate = $true; $plugins += "UI" }
+            if ($labels -contains "update-plugin-playerweb")   { $isPluginUpdate = $true; $plugins += "PlayerWeb" }
+            if ($labels -contains "update-plugin-scrsaver")    { $isPluginUpdate = $true; $plugins += "ScrSaver" }
+            if ($labels -contains "update-plugin-ml")          { $isPluginUpdate = $true; $plugins += "ML" }
+            if ($labels -contains "update-plugin-shaders")     { $isPluginUpdate = $true; $plugins += "Shaders" }
+        }
+
+        # ── Calculate version ────────────────────────────────────────
+        if ($isPluginUpdate) {
+            Write-Host "Plugin update ($($plugins -join ', ')) - version unchanged: $currentVersion"
+        } else {
+            Write-Host "Installer-only release - no plugin updates"
+            $incrementType = "${{ steps.branch_info.outputs.increment_type }}"
+            if ($incrementType -eq "feature") {
+                $minor = $minor + 1      # 第2位 +1
+                $build = 0               # 第3位 清零
+                $revision = 0            # 第4位 清零
+            } elseif ($incrementType -eq "minor") {
+                $build = $build + 1      # 第3位 +1
+                $revision = 0            # 第4位 清零
+            } else {
+                $revision = $revision + 1  # 第4位 +1
+            }
         }
 
         $newVersion = "$major.$minor.$build.$revision"
         # 使用下划线分隔，避免各组件 >= 10 时产生歧义（如 0.10.0.0 → 01000 与 0.1.0.0.0 冲突）
         $newVersionText = "${major}_${minor}_${build}_${revision}"
-
         Write-Host "Version: $currentVersion -> $newVersion"
 
-        Write-Output "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
-        Write-Output "new_version=$newVersion" >> $env:GITHUB_OUTPUT
-        Write-Output "new_version_text=$newVersionText" >> $env:GITHUB_OUTPUT
+        # ── Generate build number: YYMM + R + xx (每月重置) ─────────
+        # 查询 GitHub releases 统计当月发布次数
+        $now = Get-Date
+        $yearMonth = $now.ToString("yyMM")
+        $repo = "${{ github.repository }}"
+        
+        # 获取所有 releases，统计当月 tag 数量
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases" -Headers @{ "Accept" = "application/vnd.github.v3+json" }
+        $monthPattern = "v.*${yearMonth}R"
+        $monthCount = ($releases | Where-Object { $_.tag_name -match $monthPattern }).Count
+        $buildSeq = $monthCount + 1
+        
+        $buildNumber = "${yearMonth}R{0:D2}" -f $buildSeq
+        Write-Host "Build number: $buildNumber (month count: $monthCount, seq: $buildSeq)"
+
+        # ── Generate release tag ─────────────────────────────────────
+        # Plugin 更新：tag 后缀用字母编码 build number，保证旧客户端正则兼容
+        #   数字 0-9 → A-J，字母原样保留
+        #   例：2607R01 → CGAHRAAB
+        #   tag：v0.4.1.0pluginCGAHRAAB → 正则后 0.4.1.0
+        # 常规更新：tag 为 v{version}
+        if ($isPluginUpdate) {
+            $encoded = ($buildNumber.ToCharArray() | ForEach-Object {
+                if ($_ -ge '0' -and $_ -le '9') { [char]([int][char]'A' + ([int]$_ - [int][char]'0')) } else { $_ }
+            }) -join ''
+            $releaseTag = "v${newVersion}plugin${encoded}"
+        } else {
+            $releaseTag = "v${newVersion}"
+        }
+        Write-Host "Release tag: $releaseTag"
+
+        # ── Outputs ──────────────────────────────────────────────────
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "current_version=$currentVersion`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "current_version_text=$currentVersionText`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "new_version=$newVersion`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "new_version_text=$newVersionText`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "has_plugin_update=$($isPluginUpdate.ToString().ToLower())`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "update_plugins=$($plugins -join ';')`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "build_number=$buildNumber`n", $utf8NoBom)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "release_tag=$releaseTag`n", $utf8NoBom)
 
     - name: Capture PR title and body
       id: pr_info
@@ -199,6 +267,25 @@ jobs:
 
     - name: Rebuild solution
       run: msbuild src/VirtualPaper.sln /t:Rebuild /p:Configuration=Release /p:Platform="Any CPU" /restore /m
+
+    - name: Generate app_build.json
+      shell: pwsh
+      run: |
+        $buildNumber = "${{ needs.prepare.outputs.build_number }}"
+        $outDir = "src/VirtualPaper/bin/Release/net8.0-windows10.0.19041.0"
+        $json = @{
+            app_build = $buildNumber
+            plugins = @{
+                UI = $buildNumber
+                PlayerWeb = $buildNumber
+                ScrSaver = $buildNumber
+                ML = $buildNumber
+                Shaders = $buildNumber
+            }
+        } | ConvertTo-Json -Depth 3
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText("$outDir/app_build.json", $json, $utf8NoBom)
+        Write-Host "[OK] Generated app_build.json with build $buildNumber"
 
     - name: Validate Build Artifacts
       # 在产物就地校验：主 exe / Plugin exe / 核心 dll 存在且非空。
@@ -524,12 +611,115 @@ jobs:
         Write-Host "[OK] Standalone-UI guard test passed"
 
   # ─────────────────────────────────────────────────────────────
+  # Job 4.5: 制作插件更新包（plugin zips + manifest）
+  # 仅在冒烟测试通过且 PR 有 plugin-packages 标签时执行
+  # ─────────────────────────────────────────────────────────────
+  package_plugin_update:
+    name: Create Plugin Packages
+    runs-on: windows-latest
+    needs: [prepare, build, smoke_test]
+    if: needs.prepare.outputs.has_plugin_update == 'true'
+
+    steps:
+    - name: Download build output
+      uses: actions/download-artifact@v4
+      with:
+        name: build-release-output
+        path: src/
+
+    - name: Create Plugin packages
+      shell: pwsh
+      run: |
+        $buildDir = "src/VirtualPaper/bin/Release/net8.0-windows10.0.19041.0"
+        $pluginsDir = "$buildDir/Plugins"
+        $outputDir = "plugin-packages"
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+
+        $buildNumber = "${{ needs.prepare.outputs.build_number }}"
+        $plugins = "${{ needs.prepare.outputs.update_plugins }}" -split ';' | Where-Object { $_ -ne "" }
+
+        # Create each plugin zip containing only the plugin folder
+        foreach ($plugin in $plugins) {
+            $pluginDir = "$pluginsDir/$plugin"
+            if (Test-Path $pluginDir) {
+                $pluginLower = $plugin.ToLower()
+                $zipName = "plugin-$pluginLower-$buildNumber.zip"
+                $zipPath = "$outputDir/$zipName"
+                # Zip the folder itself (not just contents)
+                Compress-Archive -Path $pluginDir -DestinationPath $zipPath -Force
+                Write-Host "[OK] Created $zipName"
+            } else {
+                Write-Warning "Plugin directory not found: $pluginDir"
+            }
+        }
+
+        # Generate update_manifest.json with zip-level SHA256
+        # 使用 System.Text.Json 的 Utf8JsonWriter 替代 ConvertTo-Json，
+        # 避免 PowerShell 5.1 默认缩进随嵌套深度爆炸的问题
+        $ms = [System.IO.MemoryStream]::new()
+        $writer = [System.Text.Json.Utf8JsonWriter]::new($ms, [System.Text.Json.JsonWriterOptions]@{
+            Indented = $true
+        })
+
+        $writer.WriteStartObject()
+        $writer.WriteString("type", "plugins")
+        $writer.WriteString("app_build", $buildNumber)
+        $writer.WriteString("min_app_build", $buildNumber)
+        $writer.WritePropertyName("plugins")
+        $writer.WriteStartObject()
+
+        foreach ($plugin in $plugins) {
+            $pluginLower = $plugin.ToLower()
+            $zipName = "plugin-$pluginLower-$buildNumber.zip"
+            $zipPath = "$outputDir/$zipName"
+            if (Test-Path $zipPath) {
+                $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+                $writer.WritePropertyName($plugin)
+                $writer.WriteStartObject()
+                $writer.WriteString("build", $buildNumber)
+                $writer.WriteString("asset", $zipName)
+                $writer.WriteString("sha256", $hash)
+                $writer.WriteEndObject()
+            }
+        }
+
+        $writer.WriteEndObject()
+        $writer.WriteEndObject()
+        $writer.Flush()
+
+        $manifestJson = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
+        $writer.Dispose()
+        $ms.Dispose()
+
+        # Use UTF-8 without BOM to match client-side hash computation
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText("$outputDir/plugin-manifest.json", $manifestJson, $utf8NoBom)
+        Write-Host "[OK] Generated plugin-manifest.json"
+        Write-Host $manifestJson
+
+        # Generate PLUGIN_MANIFEST_SHA256.txt for manifest verification
+        $manifestHash = (Get-FileHash -Path "$outputDir/plugin-manifest.json" -Algorithm SHA256).Hash.ToLower()
+        [System.IO.File]::WriteAllText("$outputDir/PLUGIN_MANIFEST_SHA256.txt", $manifestHash, $utf8NoBom)
+        Write-Host "[OK] Generated PLUGIN_MANIFEST_SHA256.txt: $manifestHash"
+
+    - name: Upload plugin update packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: VirtualPaper-Plugins-v${{ needs.prepare.outputs.new_version }}
+        path: plugin-packages/
+        retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────
   # Job 5: 将版本号递增变更提交到 main（冒烟测试通过后才提交）
   # ─────────────────────────────────────────────────────────────
   bump:
     name: Bump Version to main
     runs-on: windows-latest
-    needs: [prepare, package, smoke_test]
+    needs: [prepare, package, smoke_test, package_plugin_update]
+    if: |
+      always() &&
+      needs.prepare.outputs.has_plugin_update != 'true' &&
+      needs.smoke_test.result == 'success'
 
     steps:
     - name: Checkout main with full history
@@ -589,6 +779,9 @@ jobs:
     name: Sync Version to Pre-publish Branches
     runs-on: windows-latest
     needs: [prepare, bump]
+    if: |
+      always() &&
+      needs.bump.result == 'success'
 
     steps:
     - name: Checkout with full history
@@ -650,15 +843,15 @@ jobs:
   summary:
     name: Summary
     runs-on: ubuntu-latest
-    needs: [prepare, build, package, smoke_test, bump, sync]
-    if: >-
+    needs: [prepare, build, package, smoke_test, package_plugin_update, bump, sync]
+    if: |
       !cancelled() &&
       needs.prepare.result == 'success' &&
       needs.build.result == 'success' &&
       needs.package.result == 'success' &&
       needs.smoke_test.result == 'success' &&
-      needs.bump.result == 'success' &&
-      needs.sync.result == 'success'
+      (needs.prepare.outputs.has_plugin_update == 'true' || (needs.bump.result == 'success' && needs.sync.result == 'success')) &&
+      (needs.prepare.outputs.has_plugin_update != 'true' || needs.package_plugin_update.result == 'success')
 
     steps:
     - name: Print summary
@@ -675,10 +868,25 @@ jobs:
         echo    "Source  : ${{ needs.prepare.outputs.source_branch }} -> main"
         echo    "Type    : $TYPE"
         echo -e "\033[0;36mPackage : ${{ needs.package.outputs.installer_name }}\033[0m"
+        
+        if [ "${{ needs.prepare.outputs.has_plugin_update }}" = "true" ]; then
+          echo -e "\033[0;36mPlugins Update: YES (plugins: ${{ needs.prepare.outputs.update_plugins }}, build: ${{ needs.prepare.outputs.build_number }})\033[0m"
+        else
+          echo    "Plugins Update: NO (installer only)"
+        fi
+        
         echo ""
-        echo -e "\033[0;32m[OK]\033[0m Version updated and committed to main"
-        echo -e "\033[0;32m[OK]\033[0m Version synced to pre-publish branches (release / dev / bugfix)"
+        if [ "${{ needs.prepare.outputs.has_plugin_update }}" = "true" ]; then
+          echo -e "\033[0;33m[SKIP]\033[0m Version bump skipped (plugin update - version unchanged)"
+          echo -e "\033[0;33m[SKIP]\033[0m Branch sync skipped (plugin update)"
+        else
+          echo -e "\033[0;32m[OK]\033[0m Version updated and committed to main"
+          echo -e "\033[0;32m[OK]\033[0m Version synced to pre-publish branches (release / dev / bugfix)"
+        fi
         echo -e "\033[0;32m[OK]\033[0m Installer uploaded as Artifact"
+        if [ "${{ needs.prepare.outputs.has_plugin_update }}" = "true" ]; then
+          echo -e "\033[0;32m[OK]\033[0m Plugins update packages uploaded as Artifact"
+        fi
         echo -e "\033[0;32m[OK]\033[0m Smoke test passed (install + launch + singleton)"
         echo -e "\033[0;32m[OK]\033[0m Draft GitHub Release will be created: v${{ needs.prepare.outputs.new_version }}"
         echo -e "\033[0;32m==========================================\033[0m"
@@ -689,13 +897,21 @@ jobs:
   #   - 以 PR body 作为 Release 正文
   #   - Tag / Release 标题均为 "v版本号"
   #   - 将 Installer exe 作为 Release 附件上传
+  #   - 如有重启式更新包，一并上传
   #   - 创建为草稿（draft），需人工验证后手动点击发布
   # ─────────────────────────────────────────────────────────────
   release:
     name: Create Draft GitHub Release
     runs-on: ubuntu-latest
-    needs: [prepare, package, summary]
-    if: needs.summary.result == 'success'
+    needs: [prepare, build, package, smoke_test, package_plugin_update, bump, sync, summary]
+    if: |
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      needs.build.result == 'success' &&
+      needs.package.result == 'success' &&
+      needs.smoke_test.result == 'success' &&
+      (needs.prepare.outputs.has_plugin_update == 'true' || (needs.bump.result == 'success' && needs.sync.result == 'success')) &&
+      (needs.prepare.outputs.has_plugin_update != 'true' || needs.package_plugin_update.result == 'success')
 
     steps:
     - name: Download installer artifact
@@ -704,30 +920,43 @@ jobs:
         name: VirtualPaper-Installer-v${{ needs.prepare.outputs.new_version }}
         path: dist/
 
+    - name: Download plugin update artifact
+      if: needs.prepare.outputs.has_plugin_update == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: VirtualPaper-Plugins-v${{ needs.prepare.outputs.new_version }}
+        path: dist/plugin-packages/
+
     - name: Create Draft Release & Tag
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ needs.prepare.outputs.new_version }}
-        name: v${{ needs.prepare.outputs.new_version }}
+        tag_name: ${{ needs.prepare.outputs.release_tag }}
+        name: ${{ needs.prepare.outputs.has_plugin_update == 'true' && format('v{0} Plugin Update (Build {1})', needs.prepare.outputs.new_version, needs.prepare.outputs.build_number) || format('v{0} (Build {1})', needs.prepare.outputs.new_version, needs.prepare.outputs.build_number) }}
         body: ${{ needs.prepare.outputs.pr_body }}
         files: |
           dist/*.exe
           dist/SHA256.txt
+          dist/plugin-packages/*.zip
+          dist/plugin-packages/plugin-manifest.json
+          dist/plugin-packages/PLUGIN_MANIFEST_SHA256.txt
         draft: true        # 草稿状态，不对外公开，等待人工验证后发布
         make_latest: false  # 草稿阶段不标记为最新，发布时再生效
         token: ${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────────────────────
-  # Job 9: 失败回滚（任意 job 失败时执行）
+  # Job 9: 失败回滚（bump 或 sync 执行后失败时）
   # ─────────────────────────────────────────────────────────────
   rollback:
     name: Rollback on Failure
     runs-on: windows-latest
-    needs: [prepare, build, package, smoke_test, bump, sync]
-    # 触发条件：bump 或 sync 已经开始执行（分支内容已被修改），且流程出现失败或取消。
-    # build 失败时 bump/sync 均为 skipped（分支未动），不触发，避免无意义的回滚操作。
+    needs: [prepare, build, package, smoke_test, package_plugin_update, bump, sync]
+    # 触发条件：
+    #   1. 仅针对常规安装式更新（重启式更新不涉及版本同步，无需回滚）
+    #   2. bump 或 sync 已经开始执行（分支内容已被修改），且流程出现失败或取消
+    #   3. bump 依赖 smoke_test 成功，因此 smoke_test 失败时 bump/sync 均为 skipped，不触发回滚
     if: |
       always() &&
+      needs.prepare.outputs.has_plugin_update != 'true' &&
       needs.prepare.result == 'success' &&
       (needs.bump.result != 'skipped' || needs.sync.result != 'skipped') &&
       (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))

@@ -64,6 +64,12 @@ namespace VirtualPaper.Common {
             public static string TempWebView2Dir => Path.Combine(AppDataDir, "WebView2");
             public static string TempScrWebView2Dir => Path.Combine(AppDataDir, "ScrWebView2");
 
+            public static string InstallerCacheDir => Path.Combine(AppDataDir, "installer_cache");
+            public static string PendingUpdatesDir => Path.Combine(AppDataDir, "pending_updates");
+            public static string UpdateFlagPath => Path.Combine(PendingUpdatesDir, "update.flag");
+            public static string UpdateBackupDir => Path.Combine(PendingUpdatesDir, "_backup");
+            public static string RollbackNoticePath => Path.Combine(AppDataDir, "update_rollback_notice.json");
+
             private static class Legacy {
                 public static string AppRulesPath => Path.Combine(AppDataDir, "AppRules.json");
                 public static string WallpaperLayoutPath => Path.Combine(AppDataDir, "WallpaperLayout.json");
@@ -129,6 +135,7 @@ namespace VirtualPaper.Common {
             public static string PipeServerName => UniqueAppUid + Environment.UserName;
             public static string UniqueAppUid => "Virtual:WALLPAPERSYSTEM";
             public static string UniqueAppUIUid => "Virtual:UI:WALLPAPERSYSTEM";
+            public static string AppBuildFile => "app_build.json";
         }
 
         public static class EnviromentVarKey {
@@ -154,6 +161,20 @@ namespace VirtualPaper.Common {
             public static string InfobarMsg_Err => "InfobarMsg_Err";
             public static string InfobarMsg_ImportErr => "InfobarMsg_ImportErr";
             public static string InfobarMsg_Success => "InfobarMsg_Success";
+            public static string AppUpdater_RollbackMessage => "AppUpdater_RollbackMessage";
+            public static string Settings_General_Version_Plugins => "Settings_General_Version_Plugins";
+            public static string PluginsUpdate_InvalidInfo => "PluginsUpdate_InvalidInfo";
+            public static string PluginsUpdate_Starting => "PluginsUpdate_Starting";
+            public static string PluginsUpdate_Completed => "PluginsUpdate_Completed";
+            public static string PluginsUpdate_Failed => "PluginsUpdate_Failed";
+            public static string PluginsUpdate_Stage_Downloading => "PluginsUpdate_Stage_Downloading";
+            public static string PluginsUpdate_Stage_BackingUp => "PluginsUpdate_Stage_BackingUp";
+            public static string PluginsUpdate_Stage_Replacing => "PluginsUpdate_Stage_Replacing";
+            public static string PluginsUpdate_Stage_Completed => "PluginsUpdate_Stage_Completed";
+            public static string PluginsUpdate_Stage_Failed => "PluginsUpdate_Stage_Failed";
+            public static string PluginsUpdate_Close => "PluginsUpdate_Close";
+            public static string PluginsUpdate_PostponeTip => "PluginsUpdate_PostponeTip";
+            public static string Find_New_Version_Restart => "Find_New_Version_Restart";
             public static string ScreenSaver__effectBubble => "ScreenSaver__effectBubble";
             public static string ScreenSaver__effectNone => "ScreenSaver__effectNone";
             public static string Settings_General_AppearanceAndAction__sysbdAcrylic => "Settings_General_AppearanceAndAction__sysbdAcrylic";
@@ -295,6 +316,15 @@ namespace VirtualPaper.Common {
             public static string? Project_StaticImg_Text_EffectDesc_Screen { get; }
             public static string? Project_StaticImg_Text_EffectDesc_Overlay { get; }
             public static string? Project_StaticImg_Text_EffectDesc_SoftLight { get; }
+            public static string? Settings_General_Version_FindNew { get; }
+            public static string? AppUpdater_SpeedText_Ready { get; }
+            public static string? Settings_General_Version_DownloadStart { get; }
+            public static string? Settings_General_Version_Install { get; }
+            public static string? Settings_General_Version_InstallerReady { get; }
+            public static string? Settings_General_Version_PluginsReady { get; }
+            public static string? PluginUpdate_ReplacedPlugin { get; }
+            public static string? PluginUpdate_Title_Completed { get; }
+            public static string? PluginUpdate_Title_Failed { get; }
         }
 
         public static class Field {

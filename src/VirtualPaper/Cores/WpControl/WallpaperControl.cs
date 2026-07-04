@@ -11,6 +11,7 @@ using VirtualPaper.Common.Utils.IPC;
 using VirtualPaper.Common.Utils.PInvoke;
 using VirtualPaper.Common.Utils.Shell;
 using VirtualPaper.Common.Utils.Storage;
+using VirtualPaper.Cores.AppUpdate;
 using VirtualPaper.Cores.Monitor;
 using VirtualPaper.DataAssistor;
 using VirtualPaper.Factories.Interfaces;
@@ -51,6 +52,10 @@ namespace VirtualPaper.Cores.WpControl {
 
             this._monitorManager.MonitorUpdated += MonitorSettingsChanged_Hwnd;
             this.WallpaperChanged += SetupDesktop_WallpaperChanged;
+
+            _jobService.PluginsUpdateFinishedEvent += (s, e) => {
+                _ = RestoreWallpaperAsync();
+            };
 
             SystemEvents.SessionSwitch += (s, e) => {
                 if (e.Reason == SessionSwitchReason.SessionUnlock) {
@@ -193,8 +198,11 @@ namespace VirtualPaper.Cores.WpControl {
             }
         }
 
-        public Grpc_RestartWallpaperResponse RestoreWallpaper() {
+        public async Task<Grpc_RestartWallpaperResponse> RestoreWallpaperAsync() {
             Grpc_RestartWallpaperResponse response = new();
+
+            // Wait for any pending plugin update to complete
+            await UpdateLock.WaitAllAsync();
 
             try {
                 ArcLog.GetLogger<WallpaperControl>().Info("Restore wallpapers...");
@@ -204,7 +212,7 @@ namespace VirtualPaper.Cores.WpControl {
                     if (wallpaperLayouts.Count > 0) {
                         var layout = wallpaperLayouts.FirstOrDefault(x => x.MonitorDeviceId == _monitorManager.PrimaryMonitor.DeviceId);
                         var data = WallpaperUtil.GetWallpaperByFolder(layout.FolderPath, _monitorManager.PrimaryMonitor.Content, layout.RType);
-                        SetWallpaperAsync(data.GetPlayerData(), _monitorManager.PrimaryMonitor);
+                        _ = SetWallpaperAsync(data.GetPlayerData(), _monitorManager.PrimaryMonitor);
                     }
                 }
                 else {
@@ -310,7 +318,7 @@ namespace VirtualPaper.Cores.WpControl {
                             }
                             else {
                                 instance.Closing += ClosingEvent;
-                                _jobService.AddProcess(instance.Proc.Id);
+                                _jobService.AddProcess(instance.Proc.Id, PluginName.PlayerWeb);
                                 _monitorManager.UpdateTargetMonitorThu(monitorIdx, data.ThumbnailPath);
                                 _wallpapers.Add(instance);
                             }
@@ -339,7 +347,7 @@ namespace VirtualPaper.Cores.WpControl {
                             }
                             else {
                                 instance.Closing += ClosingEvent;
-                                _jobService.AddProcess(instance.Proc.Id);
+                                _jobService.AddProcess(instance.Proc.Id, PluginName.PlayerWeb);
                                 _monitorManager.UpdateTargetMonitorThu(monitorIdx, data.ThumbnailPath);
                                 _wallpapers.Add(instance);
                             }
@@ -369,7 +377,7 @@ namespace VirtualPaper.Cores.WpControl {
                                 }
                                 else {
                                     instance.Closing += ClosingEvent;
-                                    _jobService.AddProcess(instance.Proc.Id);
+                                    _jobService.AddProcess(instance.Proc.Id, PluginName.PlayerWeb);
                                     _monitorManager.UpdateTargetMonitorThu(monitorIdx, data.ThumbnailPath);
                                     _wallpapers.Add(instance);
                                 }
@@ -855,9 +863,11 @@ namespace VirtualPaper.Cores.WpControl {
         private void ClosingEvent(object? s, EventArgs e) {
             if (s is not IWpPlayer instance) return;
 
+            var pid = instance.Proc.Id;
             instance.Closing -= ClosingEvent;
             instance.Closing = null;
             _wallpapers.RemoveAll(x => x.Monitor!.DeviceId == instance.Monitor!.DeviceId);
+            _jobService.StopPlugin(pid);
         }
 
         private void SetupDesktop_WallpaperChanged(object? sender, EventArgs e) {

@@ -11,9 +11,12 @@
 		<AssemblyVersion>0.5.2.0</AssemblyVersion>
 		<ApplicationIcon>virtualpaper.ico</ApplicationIcon>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Folder Include="Cores\AppUpdate\Models\" />
 		<Folder Include="Plugins\" />
 	</ItemGroup>
 
@@ -51,7 +54,7 @@
 			<_PluginFiles Include="$(MSBuildProjectDirectory)\Plugins\**\*" Exclude="$(MSBuildProjectDirectory)\Plugins\**\*.pdb;&#xD;&#xA;			                       $(MSBuildProjectDirectory)\Plugins\**\*.xml" />
 		</ItemGroup>
 		<Copy SourceFiles="@(_PluginFiles)" DestinationFiles="@(_PluginFiles->'$(OutDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" OverwriteReadOnlyFiles="true" />
-		<Message Text="[Copy] Plugins ? $(OutDir)Plugins\" Importance="normal" />
+		<Message Text="[Copy] Plugins → $(OutDir)Plugins\" Importance="normal" />
 	</Target>
 
 	<!-- 构建完成后校验：确认各插件 exe 已复制到输出目录的 Plugins 子目录中 -->

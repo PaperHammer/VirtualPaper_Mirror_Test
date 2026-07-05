@@ -32,6 +32,7 @@ using VirtualPaper.GrpcServers;
 using VirtualPaper.lang;
 using VirtualPaper.Models;
 using VirtualPaper.Models.Cores.Interfaces;
+using VirtualPaper.Models.Events;
 using VirtualPaper.Services;
 using VirtualPaper.Services.Download;
 using VirtualPaper.Services.Interfaces;
@@ -86,7 +87,7 @@ namespace VirtualPaper {
             #region 必要路径处理
             try {
                 // 清空缓存
-                FileUtil.EmptyDirectory(Constants.CommonPaths.TempDir);
+                FileUtil.RemoveDirectory(Constants.CommonPaths.TempDir);
             }
             catch { }
 
@@ -132,8 +133,11 @@ namespace VirtualPaper {
                 UserSettings.Settings.WallpaperDir = Path.Combine(Constants.CommonPaths.LibraryDir, Constants.FolderName.WpStoreFolderName);
                 Directory.CreateDirectory(UserSettings.Settings.WallpaperDir);
             }
-            // 初始化语言包
+            // 初始化语言包（需在插件更新前，确保更新进度窗口文字有 i18n）
             ChangeLanguage(UserSettings.Settings.Language);
+
+            // 检查是否有未完成的插件更新（异步，不阻塞 UI 线程）
+            _ = ((IPluginsUpdateServiceInit)Services.GetRequiredService<IPluginsUpdateService>()).InitAsync();
 
             UserSettings.Save<ISettings>();
             #endregion
@@ -162,17 +166,17 @@ namespace VirtualPaper {
 
                 //restore wallpaper(s) from previous run.
                 var wpControl = Services.GetRequiredService<IWallpaperControl>();
-                wpControl.RestoreWallpaper();
+                _ = wpControl.RestoreWallpaperAsync();
 
                 // 启动屏保服务（需要在"还原壁纸"后进行）
                 bool isScrOn = UserSettings.Settings.IsScreenSaverOn;
                 if (isScrOn) {
-                    Services.GetRequiredService<IScrControl>().Start();
+                    _ = Services.GetRequiredService<IScrControl>().StartAsync();
                 }
 
                 //first run Setup-Wizard show..
                 if (UserSettings.Settings.IsFirstRun) {
-                    Services.GetRequiredService<IUIRunnerService>().ShowUI();
+                    _ = Services.GetRequiredService<IUIRunnerService>().ShowUIAsync();
                 }
             }
             catch (Exception ex) {
@@ -229,6 +233,8 @@ namespace VirtualPaper {
                 .AddSingleton<IUIRunnerService, UIRunnerService>()
                 .AddSingleton<IUserSettingsService, UserSettingsService>()
                 .AddSingleton<IAppUpdaterService, GithubUpdaterService>()
+                .AddSingleton<IPluginsUpdateService, PluginsUpdateService>()
+                .AddSingleton<IAppBuildService, AppBuildService>()
                 .AddSingleton<IDownloadService, MultiDownloadService>()
                 .AddSingleton<IWindowService, WindowService>()
                 .AddSingleton<INativeService, NativeService>()
@@ -252,6 +258,7 @@ namespace VirtualPaper {
                 .AddTransient<DebugLog>()
                 .AddTransient<AppUpdaterWindow>()
                 .AddTransient<AppUpdaterWindowViewModel>()
+                .AddTransient<PluginUpdateWindow>()
 
                 .AddTransient<TrayCommand>()
 
@@ -319,8 +326,9 @@ namespace VirtualPaper {
         public static void AppUpdateDialog(AppUpdaterEventArgs e) {
             _updateNotify = false;
             var windowService = Services.GetRequiredService<IWindowService>();
-            var info = new AppUpdateInfo(e.UpdateUri, e.UpdateSHAUri, e.UpdateVersion.ToString(), e.ChangeLog);
-            windowService.Show<AppUpdaterWindow>(info);
+
+            // Both installer-style and restart-style updates use AppUpdaterWindow
+            windowService.Show<AppUpdaterWindow>(e.Release, bringToFront: true);
         }
 
         private static int _updateNotifyAmt = 1;
@@ -331,8 +339,15 @@ namespace VirtualPaper {
                     if (_updateNotifyAmt > 0) {
                         _updateNotifyAmt--;
                         _updateNotify = true;
+
+                        var updater = Services.GetRequiredService<IAppUpdaterService>();
+                        var isRestart = updater.LastReleaseInfo?.IsPluginsUpdate == true;
+                        var toastKey = isRestart
+                            ? Constants.I18n.Find_New_Version_Restart
+                            : nameof(Constants.I18n.Settings_General_Version_FindNew);
+
                         new ToastContentBuilder()
-                            .AddText(LanguageManager.Instance["Find_New_Verison"])
+                            .AddText(LanguageManager.Instance[toastKey])
                             .Show();
                     }
 
@@ -345,7 +360,10 @@ namespace VirtualPaper {
             }));
         }
 
+        public static volatile bool IsShuttingDown;
+
         public static void ShutDown() {
+            IsShuttingDown = true;
             try {
                 _ctsPlayback.Cancel();
                 Jobs?.Close();
@@ -365,9 +383,9 @@ namespace VirtualPaper {
             Application.Current.Dispatcher.Invoke(Application.Current.Shutdown);
         }
 
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceProvider _serviceProvider = null!;
         private readonly Mutex _mutex = new(false, Constants.CoreField.UniqueAppUid);
-        private readonly NamedPipeServer _grpcServer;
+        private readonly NamedPipeServer _grpcServer = null!;
         private static readonly CancellationTokenSource _ctsPlayback = new();
         private static readonly Logger _log = LogManager.GetCurrentClassLogger();
     }

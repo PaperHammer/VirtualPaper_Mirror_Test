@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using DJ;
 using VirtualPaper.ViewModels;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
@@ -16,6 +17,11 @@ namespace VirtualPaper.Views {
             InitializeComponent();
             contentDialogService.SetDialogHost(RootContentDialog);
             DataContext = _viewModel = viewModel;
+            Loaded += AppUpdaterWindow_Loaded;
+        }
+
+        private void AppUpdaterWindow_Loaded(object sender, RoutedEventArgs e) {
+            _viewModel?.AutoStartDownload();
         }
 
         private void FluentWindow_Closed(object? sender, EventArgs e) {
@@ -32,7 +38,6 @@ namespace VirtualPaper.Views {
                 case DownloadState.DownloadFailed:
                 case DownloadState.VerifyFailed:
                 case DownloadState.Verifying:
-                case DownloadState.Completed:
                     e.Cancel = true;
 
                     var confirmClose = await _viewModel.ShowCancelDialogAsync();
@@ -59,6 +64,15 @@ namespace VirtualPaper.Views {
             if (key == Key.Tab) {
                 e.Handled = true;
             }
+        }
+
+        private void ActionBtn_Click(object sender, RoutedEventArgs e) {
+            if (_viewModel.IsPluginsUpdate && _viewModel.CurrentState == DownloadState.Completed) {
+                this.Close();
+                return;
+            }
+
+            _viewModel.OnActionCommand();
         }
 
         private readonly AppUpdaterWindowViewModel _viewModel;

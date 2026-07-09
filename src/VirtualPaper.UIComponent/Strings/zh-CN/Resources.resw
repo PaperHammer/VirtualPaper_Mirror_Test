@@ -195,6 +195,42 @@ Scale-down：尺寸与 None 或 Contain 中的一中方式相同，取决于哪�
   <data name="InfobarMsg_Success" xml:space="preserve">
     <value>已完成</value>
   </data>
+  <data name="AppUpdater_UpdateFailedMessage" xml:space="preserve">
+    <value>更新发生错误，请重试或下载完整安装包进行更新</value>
+  </data>
+  <data name="Settings_General_Version_Plugins" xml:space="preserve">
+    <value>组件版本</value>
+  </data>
+  <data name="PluginsUpdate_InvalidInfo" xml:space="preserve">
+    <value>更新信息无效</value>
+  </data>
+  <data name="PluginsUpdate_Starting" xml:space="preserve">
+    <value>正在开始更新...</value>
+  </data>
+  <data name="PluginsUpdate_Completed" xml:space="preserve">
+    <value>更新完成，UI 即将重启</value>
+  </data>
+  <data name="PluginsUpdate_Failed" xml:space="preserve">
+    <value>更新失败：{0}</value>
+  </data>
+  <data name="PluginsUpdate_Stage_Downloading" xml:space="preserve">
+    <value>正在下载组件...</value>
+  </data>
+  <data name="PluginsUpdate_Stage_BackingUp" xml:space="preserve">
+    <value>正在备份当前组件...</value>
+  </data>
+  <data name="PluginsUpdate_Stage_Replacing" xml:space="preserve">
+    <value>正在替换组件文件...</value>
+  </data>
+  <data name="PluginsUpdate_Stage_Completed" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="PluginsUpdate_Stage_Failed" xml:space="preserve">
+    <value>失败</value>
+  </data>
+  <data name="PluginsUpdate_Close" xml:space="preserve">
+    <value>关闭</value>
+  </data>
   <data name="Text_Apply" xml:space="preserve">
     <value>应用</value>
   </data>
@@ -331,7 +367,7 @@ Scale-down：尺寸与 None 或 Contain 中的一中方式相同，取决于哪�
     <value>发现新版本</value>
   </data>
   <data name="Settings_General_Version_Install" xml:space="preserve">
-    <value>立即安装</value>
+    <value>安装</value>
   </data>
   <data name="Settings_General_Version_LastCheckDate" xml:space="preserve">
     <value>上次检测时间：</value>
@@ -1547,7 +1583,6 @@ Virtual Paper 是一款免费、运行在 Windows 上的轻量级壁纸软件，
   <data name="Project_StaticImg_Effect_SoftLight" xml:space="preserve">
     <value>柔光</value>
   </data>
-  <!-- CanvasEffect 效果描述 -->
   <data name="Project_StaticImg_Text_EffectDesc_GrayScale" xml:space="preserve">
     <value>去除颜色信息，转为灰度图</value>
   </data>
@@ -1616,5 +1651,11 @@ Virtual Paper 是一款免费、运行在 Windows 上的轻量级壁纸软件，
   </data>
   <data name="Project_StaticImg_Text_EffectDesc_SoftLight" xml:space="preserve">
     <value>柔光模式，产生柔和对比</value>
+  </data>
+  <data name="Settings_General_Version_InstallerReady" xml:space="preserve">
+    <value>安装包已就绪，点击安装。安装需完全退出应用，请注意保存数据</value>
+  </data>
+  <data name="Settings_General_Version_PluginsReady" xml:space="preserve">
+    <value>组件更新已就绪，点击安装。安装需关闭主窗口，请注意保存数据</value>
   </data>
 </root>

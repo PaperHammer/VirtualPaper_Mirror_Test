@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -10,6 +9,7 @@ using Microsoft.Win32;
 using VirtualPaper.Common;
 using VirtualPaper.Common.Logging;
 using VirtualPaper.Common.Utils;
+using VirtualPaper.Common.Utils.Pipe.Interfaces;
 using VirtualPaper.Common.Utils.ThreadContext;
 using VirtualPaper.Grpc.Client.Interfaces;
 using VirtualPaper.Models;
@@ -85,9 +85,11 @@ namespace VirtualPaper.WpSettingsPanel.ViewModels {
 
         public ScreenSaverViewModel(
             IUserSettingsClient userSettingsClient,
-            IScrCommandsClient scrCommandsClient) {
+            IScrCommandsClient scrCommandsClient,
+            IPipeServerFactory pipeServerFactory) {
             _userSettingsClient = userSettingsClient;
             _scrCommandsClient = scrCommandsClient;
+            _pipeServerFactory = pipeServerFactory;
             _ctsListen = new();
 
             InitText();
@@ -126,13 +128,13 @@ namespace VirtualPaper.WpSettingsPanel.ViewModels {
             try {
                 await Task.Run(async () => {
                     while (!_ctsListen.IsCancellationRequested) {
-                        using var server = new NamedPipeServerStream("TRAY_CMD", PipeDirection.InOut, 1, PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                        using var server = _pipeServerFactory.Create(Constants.PipeControlField.TrayCmdPipeName);
                         await server.WaitForConnectionAsync(_ctsListen.Token);
-                        using var reader = new StreamReader(server);
+                        using var reader = new StreamReader(server.GetStream());
                         string? cmd = await reader.ReadLineAsync(_ctsListen.Token);
                         ArcLog.GetLogger<ScreenSaverViewModel>().Info($"[PipeServer] Received command: {cmd}");
 
-                        if (cmd == "UPDATE_SCRSETTINGS") {
+                        if (cmd == Constants.PipeControlField.CmdUpdateScrSettings) {
                             await UpdateScrSettginsAsync();
                         }
                     }
@@ -247,6 +249,7 @@ namespace VirtualPaper.WpSettingsPanel.ViewModels {
         private readonly CancellationTokenSource _ctsListen;
         private readonly IUserSettingsClient _userSettingsClient;
         private readonly IScrCommandsClient _scrCommandsClient;
+        private readonly IPipeServerFactory _pipeServerFactory;
         private string _effectNone = string.Empty;
         private string _effectBubble = string.Empty;
         public List<ProcInfo> _whiteListScr = [];

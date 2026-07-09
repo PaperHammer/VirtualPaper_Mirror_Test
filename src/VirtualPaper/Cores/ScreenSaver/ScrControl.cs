@@ -7,6 +7,7 @@ using VirtualPaper.Common;
 using VirtualPaper.Common.Logging;
 using VirtualPaper.Common.Utils.IPC;
 using VirtualPaper.Common.Utils.PInvoke;
+using VirtualPaper.Cores.AppUpdate;
 using VirtualPaper.Cores.WpControl;
 using VirtualPaper.Services.Interfaces;
 using VirtualPaper.Utils.Interfcaes;
@@ -44,7 +45,10 @@ namespace VirtualPaper.Cores.ScreenSaver {
             }
         }
 
-        public void Start() {
+        public async Task StartAsync() {
+            // Wait for any pending plugin update to complete
+            await UpdateLock.WaitAllAsync();
+
             if (!_userSettings.Settings.IsScreenSaverOn || _isTiming || IsRunning) return;
 
             try {
@@ -115,7 +119,7 @@ namespace VirtualPaper.Cores.ScreenSaver {
         }
 
         // -------------------------------------------------------------------------
-        // Process: Start
+        // Process: StartAsync
         // -------------------------------------------------------------------------
 
         private void DispatcherTimer_Tick(object? sender, EventArgs e) {
@@ -176,7 +180,7 @@ namespace VirtualPaper.Cores.ScreenSaver {
             _processLauncher.Exited += Proc_Exited;
             _processLauncher.OutputDataReceived += Proc_OutputDataReceived;
             _processLauncher.Launch(startInfo);
-            _jobService.AddProcess(_processLauncher.ProcessId);
+            _jobService.AddProcess(_processLauncher.ProcessId, PluginName.ScrSaver);
             _processLauncher.BeginOutputReadLine();
 
             ArcLog.GetLogger<ScrControl>().Info("ScreenSaver launched.");
@@ -208,11 +212,15 @@ namespace VirtualPaper.Cores.ScreenSaver {
         /// 无论是主动 Stop 还是意外退出，都走这里。
         /// </summary>
         private void Proc_Exited(object? sender, EventArgs e) {
+            var pid = _processLauncher.ProcessId;
             _processLauncher.OutputDataReceived -= Proc_OutputDataReceived;
             _processLauncher.Exited -= Proc_Exited;
 
             CleanupProc();
-            RestartTimerAfterExit();
+            if (!App.IsShuttingDown) {
+                _jobService.StopPlugin(pid);
+                RestartTimerAfterExit();
+            }
         }
 
         /// <summary>

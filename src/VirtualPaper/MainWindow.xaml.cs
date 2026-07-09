@@ -6,8 +6,8 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Toolkit.Uwp.Notifications;
 using VirtualPaper.Common;
+using VirtualPaper.Cores.PipeControl;
 using VirtualPaper.Cores.PlaybackControl;
-using VirtualPaper.Cores.TrayControl;
 using VirtualPaper.Cores.WpControl;
 using VirtualPaper.lang;
 using VirtualPaper.Models.Cores.Interfaces;
@@ -52,13 +52,13 @@ namespace VirtualPaper {
                 .Show();
         }
 
-        private void NotifyIcon_LeftDoubleClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e) {
-            _uiRunnerService.ShowUI();
+        private async void NotifyIcon_LeftDoubleClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e) {
+            await _uiRunnerService.ShowUIAsync();
             e.Handled = true;
         }
 
-        private void OpenAppMenuItem_Click(object sender, RoutedEventArgs e) {
-            _uiRunnerService.ShowUI();
+        private async void OpenAppMenuItem_Click(object sender, RoutedEventArgs e) {
+            await _uiRunnerService.ShowUIAsync();
         }
 
         private void CloseAllWpMenuItem_Click(object sender, RoutedEventArgs e) {
@@ -95,7 +95,7 @@ namespace VirtualPaper {
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e) {
-            App.ShutDown();
+            _ = App.ShutDownAsync();
         }
 
         private void Playback_PlaybackStateChanged(object? sender, PlaybackMode e) {
@@ -187,6 +187,7 @@ namespace VirtualPaper {
                 Symbol = isOn ? SymbolRegular.Checkmark20 : SymbolRegular.Empty,
             };
             srcsaver.Tag = isOn ? "On" : "Off";
+            lockScr.IsEnabled = isOn;
             deNone.IsEnabled = isOn;
             deBubble.IsEnabled = isOn;
         }
@@ -206,7 +207,7 @@ namespace VirtualPaper {
             _userSettingsService.Save<ISettings>();
 
             var pipeClient = App.Services.GetRequiredService<TrayCommand>();
-            await pipeClient.SendMsgToUIAsync("UPDATE_SCRSETTINGS");
+            await pipeClient.SendMsgToUIAsync(Constants.PipeControlField.CmdUpdateScrSettings);
         }
 
         private readonly IUIRunnerService _uiRunnerService;

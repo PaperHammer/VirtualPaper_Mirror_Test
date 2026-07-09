@@ -5,11 +5,13 @@
 
 #define AppId "{{95F4CECE-7C7C-40E1-B485-07DA64D1905F}"
 #define MyAppName "Virtual Paper"
-#define MyAppVersion "0.5.1.0"
-#define MyAppVersionText "0510"
+#define MyAppVersion "0.5.2.1"
+#define MyAppVersionText "0_5_2_1"
 #define MyAppPublisher "PaperHammer"
 #define MyAppURL "https://github.com/PaperHammer/VirtualPaper"
 #define MyAppExeName "VirtualPaper.exe"
+; Must match Constants.CoreField.AppName in VirtualPaper.Common\Constants.cs
+#define MyAppDataFolderName "VirtualPaper"
 
 [CustomMessages]
 english.DeleteEverythigMsgBox=Do you want to delete data folder?
@@ -109,10 +111,10 @@ begin
   begin
     if SuppressibleMsgBox(
          ExpandConstant('{cm:DeleteEverythigMsgBox}') + ' ' +
-         ExpandConstant('{localappdata}\{#MyAppName}') + ' ?',
+         ExpandConstant('{localappdata}\{#MyAppDataFolderName}') + ' ?',
          mbConfirmation, MB_YESNO, IDNO) = IDYES then
     begin
-      DelTree(ExpandConstant('{localappdata}\{#MyAppName}'), True, True, True);
+      DelTree(ExpandConstant('{localappdata}\{#MyAppDataFolderName}'), True, True, True);
     end;
   end;
 end;

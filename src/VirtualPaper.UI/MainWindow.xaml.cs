@@ -1,14 +1,17 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VirtualPaper.AppSettingsPanel;
 using VirtualPaper.Common;
 using VirtualPaper.Common.Logging;
+using VirtualPaper.Common.Utils.PInvoke;
 using VirtualPaper.Common.Utils.IPC;
 using VirtualPaper.Common.Utils.ThreadContext;
 using VirtualPaper.DraftPanel;
 using VirtualPaper.Grpc.Client.Interfaces;
+using VirtualPaper.Grpc.Service.TwoWay;
 using VirtualPaper.IntelligentPanel;
 using VirtualPaper.Models.Cores.Interfaces;
 using VirtualPaper.UIComponent;
@@ -28,7 +31,7 @@ namespace VirtualPaper.UI {
         public override bool IsMainWindow => true;
         public override ArcWindowManagerKey Key => _windowKey;
 
-        public MainWindow(IUserSettingsClient userSettings, ICommandsClient commandsClient)
+        public MainWindow(IUserSettingsClient userSettings, ICommandsClient commandsClient, ITwoWayClient twoWayClient)
             : base(userSettings.Settings.ApplicationTheme, userSettings.Settings.SystemBackdrop) {
             _windowKey = new ArcWindowManagerKey(ArcWindowKey.Main);
             this.InitializeComponent();
@@ -37,7 +40,9 @@ namespace VirtualPaper.UI {
 
             _userSettings = userSettings;
             _commandsClient = commandsClient;
+            _twoWayClient = twoWayClient;
             _commandsClient.UIRecieveCmd += CommandsClient_UIRecieveCmd;
+            _twoWayClient.MessageReceived += TwoWayClient_MessageReceived;
             this.AppWindow.Closing += AppWindow_Closing;
             this.Closed += MainWindow_Closed;
         }
@@ -80,14 +85,52 @@ namespace VirtualPaper.UI {
             HandleIpcMessage(e);
         }
 
-        private void HandleIpcMessage(int type) {
+        private async void TwoWayClient_MessageReceived(object? sender, TwoWayMessage e) {
+            try {
+                switch (e.Type) {
+                    case "REQUEST_CLOSE":
+                        var canClose = await NaviContent.CheckAllPagesCanCloseAsync();
+                        
+                        // 先发送关闭结果回 core（在关闭窗口前，因为关闭后 RPC 通道会断开）
+                        await _twoWayClient.SendMessageAsync(new TwoWayMessage {
+                            Type = "UI_CLOSE_RESULT",
+                            RequestId = e.RequestId,
+                            Payload = canClose.ToString()
+                        });
+                        
+                        if (canClose) {
+                            CrossThreadInvoker.InvokeOnUIThread(() => {
+                                _isSafeToClose = true;
+                                this.Close();
+                            });
+                        }
+                        break;
+                }
+            }
+            catch (Exception ex) {
+                ArcLog.GetLogger<MainWindow>().Error($"TwoWay message handling failed: {ex.Message}");
+            }
+        }
+
+        private async void HandleIpcMessage(int type) {
             try {
                 MessageType messageType = (MessageType)type;
                 switch (messageType) {
                     case MessageType.cmd_active:
                         CrossThreadInvoker.InvokeOnUIThread(() => {
-                            this.Activate();
+                            var hwnd = WindowConsts.WindowHandle;
+                            Native.ShowWindow(hwnd, (uint)Native.SHOWWINDOW.SW_RESTORE);
+                            _ = Native.SetForegroundWindow(hwnd);
                         });
+                        break;
+                    case MessageType.cmd_close:
+                        var canClose = await NaviContent.CheckAllPagesCanCloseAsync();
+                        if (canClose) {
+                            CrossThreadInvoker.InvokeOnUIThread(() => {
+                                _isSafeToClose = true;
+                                this.Close();
+                            });
+                        }
                         break;
                     default:
                         throw new InvalidOperationException($"Unsupported message type: {messageType}");
@@ -143,6 +186,7 @@ namespace VirtualPaper.UI {
 
         private readonly IUserSettingsClient _userSettings;
         private readonly ICommandsClient _commandsClient;
+        private readonly ITwoWayClient _twoWayClient;
         private readonly ArcWindowManagerKey _windowKey;
     }
 }

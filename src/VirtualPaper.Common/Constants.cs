@@ -64,6 +64,14 @@ namespace VirtualPaper.Common {
             public static string TempWebView2Dir => Path.Combine(AppDataDir, "WebView2");
             public static string TempScrWebView2Dir => Path.Combine(AppDataDir, "ScrWebView2");
 
+            public static string PendingPluginsUpdateDir => Path.Combine(AppDataDir, "pending_plugins_update");
+            public static string PendingInstallerUpdateDir => Path.Combine(AppDataDir, "pending_installer_update");
+            public static string UpdateFlagPath => Path.Combine(PendingPluginsUpdateDir, "update.flag");
+            public static string InstallerUpdateFlagPath => Path.Combine(PendingInstallerUpdateDir, "update.flag");
+            public static string UpdateBackupDir => Path.Combine(PendingPluginsUpdateDir, "_backup");
+            public static string PluginPatchExtractDir => Path.Combine(PendingPluginsUpdateDir, "extracted");
+            public static string UpdateFailedNoticePath => Path.Combine(AppDataDir, "update_failed_notice.json");
+
             private static class Legacy {
                 public static string AppRulesPath => Path.Combine(AppDataDir, "AppRules.json");
                 public static string WallpaperLayoutPath => Path.Combine(AppDataDir, "WallpaperLayout.json");
@@ -99,7 +107,7 @@ namespace VirtualPaper.Common {
         }
 
         public static class WorkingDir {
-            public static string Shader => Path.Combine(UI, "Shaders");
+            public static string Shader => Path.Combine("Plugins", "Shaders");
             public static string ML => Path.Combine("Plugins", "ML");
             public static string ML_DepthEstimate => Path.Combine(ML, "DepthEstimate");
             public static string ML_DepthEstimate_AI_Models => Path.Combine(ML_DepthEstimate, "ai_models");
@@ -129,6 +137,12 @@ namespace VirtualPaper.Common {
             public static string PipeServerName => UniqueAppUid + Environment.UserName;
             public static string UniqueAppUid => "Virtual:WALLPAPERSYSTEM";
             public static string UniqueAppUIUid => "Virtual:UI:WALLPAPERSYSTEM";
+            public static string AppBuildFile => "app_build.json";
+        }
+
+        public static class PipeControlField {
+            public static string TrayCmdPipeName => "TRAY_CMD";
+            public static string CmdUpdateScrSettings => "UPDATE_SCRSETTINGS";
         }
 
         public static class EnviromentVarKey {
@@ -154,6 +168,20 @@ namespace VirtualPaper.Common {
             public static string InfobarMsg_Err => "InfobarMsg_Err";
             public static string InfobarMsg_ImportErr => "InfobarMsg_ImportErr";
             public static string InfobarMsg_Success => "InfobarMsg_Success";
+            public static string AppUpdater_UpdateFailedMessage => "AppUpdater_UpdateFailedMessage";
+            public static string Settings_General_Version_Plugins => "Settings_General_Version_Plugins";
+            public static string PluginsUpdate_InvalidInfo => "PluginsUpdate_InvalidInfo";
+            public static string PluginsUpdate_Starting => "PluginsUpdate_Starting";
+            public static string PluginsUpdate_Completed => "PluginsUpdate_Completed";
+            public static string PluginsUpdate_Failed => "PluginsUpdate_Failed";
+            public static string PluginsUpdate_Stage_Downloading => "PluginsUpdate_Stage_Downloading";
+            public static string PluginsUpdate_Stage_BackingUp => "PluginsUpdate_Stage_BackingUp";
+            public static string PluginsUpdate_Stage_Replacing => "PluginsUpdate_Stage_Replacing";
+            public static string PluginsUpdate_Stage_Completed => "PluginsUpdate_Stage_Completed";
+            public static string PluginsUpdate_Stage_Failed => "PluginsUpdate_Stage_Failed";
+            public static string PluginsUpdate_Close => "PluginsUpdate_Close";
+            public static string PluginsUpdate_PostponeTip => "PluginsUpdate_PostponeTip";
+            public static string Find_New_Version_Restart => "Find_New_Version_Restart";
             public static string ScreenSaver__effectBubble => "ScreenSaver__effectBubble";
             public static string ScreenSaver__effectNone => "ScreenSaver__effectNone";
             public static string Settings_General_AppearanceAndAction__sysbdAcrylic => "Settings_General_AppearanceAndAction__sysbdAcrylic";
@@ -189,6 +217,11 @@ namespace VirtualPaper.Common {
             public static string WpCreateDialog_AIWp_Title => "WpCreateDialog_AIWp_Title";
             public static string WpCreateDialog_CommonWp_Explain => "WpCreateDialog_CommonWp_Explain";
             public static string WpCreateDialog_CommonWp_Title => "WpCreateDialog_CommonWp_Title";
+            public static string WpLib_TypeFilter_All => "WpLib_TypeFilter_All";
+            public static string WpLib_TypeFilter_StaticImage => "WpLib_TypeFilter_StaticImage";
+            public static string WpLib_TypeFilter_DynamicImage => "WpLib_TypeFilter_DynamicImage";
+            public static string WpLib_TypeFilter_Video => "WpLib_TypeFilter_Video";
+            public static string WpLib_TypeFilter_WebInteractive => "WpLib_TypeFilter_WebInteractive";
             public static string? Project_DeployNewDraft_PreviousStep { get; }
             public static string? Project_DeployNewDraft_NextStep { get; }
             public static string? Project_NewName_InvalidTip { get; }
@@ -236,7 +269,69 @@ namespace VirtualPaper.Common {
             public static string? Add_To_Lib_Success { get; }
             public static string? Intelligent_Enhance_QualityRestore { get; }
             public static string? Intelligent_Enhance_SuperResolution { get; }
-            public static object Text_Error_InvalidFile { get; set; }
+            public static string? Text_Error_InvalidFile { get; }
+            // ── CanvasEffect 分组标题 ──────────────────────────────
+            public static string? Project_StaticImg_EffectGroup_Adjust { get; }
+            public static string? Project_StaticImg_EffectGroup_Color { get; }
+            public static string? Project_StaticImg_EffectGroup_Special { get; }
+            public static string? Project_StaticImg_EffectGroup_Blend { get; }
+            // ── CanvasEffect 效果名称 ─────────────────────────────
+            public static string? Project_StaticImg_Text_Effect_GrayScale { get; }
+            public static string? Project_StaticImg_Text_Effect_Invert { get; }
+            public static string? Project_StaticImg_Text_Effect_Exposure { get; }
+            public static string? Project_StaticImg_Text_Effect_Brightness { get; }
+            public static string? Project_StaticImg_Text_Effect_Saturation { get; }
+            public static string? Project_StaticImg_Text_Effect_Hue { get; }
+            public static string? Project_StaticImg_Text_Effect_Contrast { get; }
+            public static string? Project_StaticImg_Text_Effect_Temperature { get; }
+            public static string? Project_StaticImg_Text_Effect_Highlights { get; }
+            public static string? Project_StaticImg_Text_Effect_Sepia { get; }
+            public static string? Project_StaticImg_Text_Effect_Pixelate { get; }
+            public static string? Project_StaticImg_Text_Effect_Emboss { get; }
+            public static string? Project_StaticImg_Text_Effect_Blur { get; }
+            public static string? Project_StaticImg_Text_Effect_Sharpen { get; }
+            public static string? Project_StaticImg_Text_Effect_Noise { get; }
+            public static string? Project_StaticImg_Text_Effect_Vignette { get; }
+            public static string? Project_StaticImg_Text_Effect_Glow { get; }
+            public static string? Project_StaticImg_Text_Effect_Bloom { get; }
+            public static string? Project_StaticImg_Text_Effect_Distort { get; }
+            public static string? Project_StaticImg_Text_Effect_Multiply { get; }
+            public static string? Project_StaticImg_Text_Effect_Screen { get; }
+            public static string? Project_StaticImg_Text_Effect_Overlay { get; }
+            public static string? Project_StaticImg_Text_Effect_SoftLight { get; }
+            // CanvasEffect 效果描述
+            public static string? Project_StaticImg_Text_EffectDesc_GrayScale { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Invert { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Exposure { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Brightness { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Saturation { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Hue { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Contrast { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Temperature { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Highlights { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Sepia { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Pixelate { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Emboss { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Blur { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Sharpen { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Noise { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Vignette { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Glow { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Bloom { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Distort { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Multiply { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Screen { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_Overlay { get; }
+            public static string? Project_StaticImg_Text_EffectDesc_SoftLight { get; }
+            public static string? Settings_General_Version_FindNew { get; }
+            public static string? AppUpdater_SpeedText_Ready { get; }
+            public static string? Settings_General_Version_DownloadStart { get; }
+            public static string? Settings_General_Version_Install { get; }
+            public static string? Settings_General_Version_InstallerReady { get; }
+            public static string? Settings_General_Version_PluginsReady { get; }
+            public static string? PluginUpdate_ReplacedPlugin { get; }
+            public static string? PluginUpdate_Title_Completed { get; }
+            public static string? PluginUpdate_Title_Failed { get; }
         }
 
         public static class Field {
@@ -247,11 +342,6 @@ namespace VirtualPaper.Common {
             public static string WpEffectFilePathTemporary => "wpEffectFilePathTemporary.json";
             public static string WpEffectFilePathUsing => "wpEffectFilePathUsing.json";
             public static string WpRuntimeDataFileName => "wp_metadata_runtime.json";
-        }
-
-        public static class ColorKey {
-            public static string WindowCaptionForeground => "WindowCaptionForeground";
-            public static string WindowCaptionForegroundDisabled => "WindowCaptionForegroundDisabled";
         }
     }
 }
